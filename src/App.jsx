@@ -3,10 +3,15 @@ import EditScreen from './EditScreen';
 import './App.css';
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState('generator'); // 'generator' or 'editor'
+  const [currentScreen, setCurrentScreen] = useState('login'); // 'login', 'generator' or 'editor'
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // For drawer menu
   const [prompt, setPrompt] = useState('');
   const [imageUrls, setImageUrls] = useState([]);
   const [imageCount, setImageCount] = useState(1);
+  const [aspectRatio, setAspectRatio] = useState('1:1'); // New state for aspect ratio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [availableTokens, setAvailableTokens] = useState(1000);
@@ -17,20 +22,119 @@ function App() {
   const [recentImages, setRecentImages] = useState([]);
   const [showRecent, setShowRecent] = useState(false);
 
+  // Handle login
+  const handleLogin = (e) => {
+    e.preventDefault();
+    // Simple validation - in a real app, you would authenticate with a server
+    if (username === 'abc' && password === '123') {
+      setCurrentScreen('generator');
+      setLoginError('');
+    } else {
+      setLoginError('Invalid username or password');
+    }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    setCurrentScreen('login');
+    setUsername('');
+    setPassword('');
+  };
+
   // Gemini API configuration
-  const GEMINI_API_KEY = 'AIzaSyB9slH0K_FDyTZbkshXkv_uTPcMalzz7Jc';
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
   const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict';
 
   // Trendy prompt suggestions
   const promptSuggestions = [
-    "A futuristic cityscape at sunset with flying cars",
-    "A cute robot cat playing piano in a jazz club",
-    "An underwater castle surrounded by glowing jellyfish",
-    "A steampunk library with mechanical birds and gears",
-    "A magical forest with floating lanterns and unicorns",
-    "A cyberpunk marketplace with neon signs and holograms",
-    "A cozy cabin in the mountains during winter",
-    "A space station orbiting a colorful nebula"
+  // --- CATEGORY: 3D & CUTE ---
+  {
+    id: 1,
+    label: "3D Isometric Room",
+    category: "3D Art",
+    prompt: "A cozy isometric living room with a fireplace, soft pastel colors, low poly style, warm lighting, 3D render, high detail, trending on ArtStation"
+  },
+  {
+    id: 2,
+    label: "Cute Robot Jazz",
+    category: "Characters",
+    prompt: "A cute glossy robot cat playing a saxophone in a dimly lit vintage jazz club, cinematic lighting, bokeh effect, Pixar style 3D render"
+  },
+  {
+    id: 3,
+    label: "Vinyl Toy Figure",
+    category: "Characters",
+    prompt: "A collectible vinyl toy figure of a samurai wearing streetwear, vibrant colors, studio lighting, clean background, Pop Mart style"
+  },
+
+  // --- CATEGORY: SCENIC & FANTASY ---
+  {
+    id: 4,
+    label: "Cyberpunk Market",
+    category: "Sci-Fi",
+    prompt: "A bustling cyberpunk night market, neon signs in Japanese, rain-slicked streets, volumetric fog, holographic advertisements, photorealistic, 8k"
+  },
+  {
+    id: 5,
+    label: "Floating Islands",
+    category: "Fantasy",
+    prompt: "Majestic floating islands in the sky connected by waterfalls, golden hour sunlight, dreamlike atmosphere, Studio Ghibli art style"
+  },
+  {
+    id: 6,
+    label: "Bioluminescent Ocean",
+    category: "Nature",
+    prompt: "Deep underwater castle surrounded by glowing jellyfish and bioluminescent coral reefs, deep blue and neon pink color palette, 4k realistic"
+  },
+
+  // --- CATEGORY: ARTISTIC & ABSTRACT ---
+  {
+    id: 7,
+    label: "Liquid Gold Wave",
+    category: "Abstract",
+    prompt: "Abstract fluid art, swirling waves of liquid gold and black marble, glossy texture, macro photography, luxury background"
+  },
+  {
+    id: 8,
+    label: "Paper Cutout Art",
+    category: "Artistic",
+    prompt: "Layered paper cutout art of a mountain landscape at sunset, intricate details, shadow depth, craft paper texture, soft lighting"
+  },
+  {
+    id: 9,
+    label: "Steampunk Library",
+    category: "Sci-Fi",
+    prompt: "A grand steampunk library with brass gears, mechanical birds, steam pipes, leather books, warm amber lighting, intricate Victorian architecture"
+  },
+  {
+    id: 10,
+    label: "Cosmic Nebula",
+    category: "Space",
+    prompt: "A space station orbiting a colorful nebula, vibrant purples and oranges, cinematic composition, epic scale, sci-fi concept art"
+  },
+  
+  // --- CATEGORY: PHOTOGRAPHY ---
+  {
+    id: 11,
+    label: "Fashion Portrait",
+    category: "Photography",
+    prompt: "Double exposure portrait of a woman and a forest, misty atmosphere, artistic, surreal, high contrast, black and white photography"
+  },
+  {
+    id: 12,
+    label: "Macro Eye",
+    category: "Photography",
+    prompt: "Extreme macro close-up of a human eye reflecting a galaxy, hyper-realistic, incredible detail, sharp focus, 8k resolution"
+  }
+];
+
+  // Aspect ratio options
+  const aspectRatios = [
+    { value: '1:1', label: '1:1 (Square)' },
+    { value: '16:9', label: '16:9 (Landscape)' },
+    { value: '9:16', label: '9:16 (Portrait)' },
+    { value: '4:3', label: '4:3 (Standard)' },
+    { value: '3:4', label: '3:4 (Vertical)' }
   ];
 
   // Initialize with token data and recent images
@@ -81,6 +185,51 @@ function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
+  // Handle aspect ratio for browsers that don't support CSS aspect-ratio
+  useEffect(() => {
+    const handleAspectRatioFallback = () => {
+      const images = document.querySelectorAll('.generated-image[data-aspect-ratio]');
+      images.forEach(img => {
+        // Check if browser supports aspect-ratio
+        if (!window.CSS || !window.CSS.supports('aspect-ratio', '1 / 1')) {
+          const aspectRatio = img.getAttribute('data-aspect-ratio');
+          if (aspectRatio) {
+            const ratios = aspectRatio.split(':');
+            if (ratios.length === 2) {
+              const widthRatio = parseInt(ratios[0], 10);
+              const heightRatio = parseInt(ratios[1], 10);
+              if (widthRatio && heightRatio) {
+                const container = img.closest('.image-display-container');
+                if (container) {
+                  // Set padding-top to maintain aspect ratio
+                  const percentage = (heightRatio / widthRatio) * 100;
+                  container.style.position = 'relative';
+                  container.style.paddingTop = `${percentage}%`;
+                  container.style.height = '0';
+                  img.style.position = 'absolute';
+                  img.style.top = '0';
+                  img.style.left = '0';
+                  img.style.width = '100%';
+                  img.style.height = '100%';
+                }
+              }
+            }
+          }
+        }
+      });
+    };
+
+    // Run on initial load and when images change
+    handleAspectRatioFallback();
+    
+    // Also run when window is resized
+    window.addEventListener('resize', handleAspectRatioFallback);
+    
+    return () => {
+      window.removeEventListener('resize', handleAspectRatioFallback);
+    };
+  }, [imageUrls, recentImages]);
+
   // Save token usage and recent images to localStorage
   useEffect(() => {
     localStorage.setItem('usedTokens', usedTokens.toString());
@@ -89,14 +238,38 @@ function App() {
   }, [usedTokens, generatedCount, recentImages]);
 
   const generateImage = async () => {
+    // Validate input
     if (!prompt.trim()) {
       setError('Please enter a prompt');
+      return;
+    }
+
+    // Validate API key
+    if (!GEMINI_API_KEY) {
+      setError('API key is missing. Please add your Gemini API key to the .env file.');
+      return;
+    }
+
+    // Validate image count
+    if (imageCount < 1 || imageCount > 4) {
+      setError('Please select a valid number of images (1-4)');
+      return;
+    }
+
+    // Validate aspect ratio
+    if (!aspectRatio) {
+      setError('Please select a valid aspect ratio');
       return;
     }
 
     setLoading(true);
     setError('');
     setImageUrls([]);
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout. The server is taking too long to respond. Please try again.')), 60000) // 60 second timeout
+    );
     
     try {
       // Calculate tokens needed for this request
@@ -107,8 +280,8 @@ function App() {
         throw new Error(`Insufficient tokens. You need ${tokensNeeded} tokens but only have ${availableTokens} available.`);
       }
       
-      // Call Gemini API for image generation
-      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      // Call Gemini API for image generation with timeout
+      const fetchPromise = fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,14 +289,18 @@ function App() {
         body: JSON.stringify({
           instances: [
             {
-              prompt: prompt,
+              prompt: prompt.trim(),
             },
           ],
           parameters: {
             sampleCount: imageCount,
+            // Add aspect ratio parameter
+            aspectRatio: aspectRatio
           },
         }),
       });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -141,6 +318,10 @@ function App() {
           return null;
         }).filter(url => url !== null);
         
+        if (urls.length === 0) {
+          throw new Error('No valid images were generated. Please try a different prompt.');
+        }
+        
         setImageUrls(urls);
         setGeneratedCount(prev => prev + urls.length);
         
@@ -154,16 +335,19 @@ function App() {
           id: Date.now() + index,
           url: url,
           prompt: prompt,
-          timestamp: new Date().toLocaleString()
+          timestamp: new Date().toLocaleString(),
+          aspectRatio: aspectRatio
         }));
         
         setRecentImages(prev => [...newImages, ...prev].slice(0, 20)); // Keep only last 20 images
       } else {
-        throw new Error('Invalid response format from API');
+        throw new Error('Invalid response format from API. Please try again.');
       }
     } catch (err) {
       setError(`Failed to generate image: ${err.message}`);
       console.error('Error generating image:', err);
+      // Ensure we show the error to the user
+      setImageUrls([]); // Clear any partial results
     } finally {
       setLoading(false);
     }
@@ -205,22 +389,100 @@ function App() {
     return <EditScreen onNavigateToGenerator={goToGenerator} />;
   }
 
+  // Show Login screen if currentScreen is 'login'
+  if (currentScreen === 'login') {
+    return (
+      <div className="app">
+        <div className="login-container">
+          <div className="login-card">
+            <h1>AI Image Generator</h1>
+            <p className="login-subtitle">Sign in to your account</p>
+            <form onSubmit={handleLogin}>
+              <div className="input-group">
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="login-input"
+                />
+              </div>
+              <div className="input-group">
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="login-input"
+                />
+              </div>
+              {loginError && <div className="error-message">{loginError}</div>}
+              <button type="submit" className="login-button">
+                Sign In
+              </button>
+            </form>
+            <div className="login-footer">
+              <p>Default credentials: abc / 123</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`app ${darkMode ? 'dark' : 'light'}`}>
+    <div className="app">
+      {/* Drawer Menu */}
+      {isMenuOpen && (
+        <div className="drawer-overlay" onClick={() => setIsMenuOpen(false)}>
+          <div className="drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <h2>Menu</h2>
+              <button className="drawer-close" onClick={() => setIsMenuOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="drawer-content">
+              <button className="drawer-item" onClick={() => { setCurrentScreen('generator'); setIsMenuOpen(false); }}>
+                🏠 Home
+              </button>
+              <button className="drawer-item" onClick={() => { goToEditor(); setIsMenuOpen(false); }}>
+                🖌️ Edit Images
+              </button>
+              <button className="drawer-item" onClick={() => { toggleTheme(); setIsMenuOpen(false); }}>
+                {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+              </button>
+              <button className="drawer-item" onClick={() => { setShowRecent(!showRecent); setIsMenuOpen(false); }}>
+                {showRecent ? '📚 Hide Recent' : '📚 Show Recent'}
+              </button>
+              <button className="drawer-item logout-item" onClick={() => { handleLogout(); setIsMenuOpen(false); }}>
+                🚪 Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="app-header">
         <div className="header-content">
           <div className="title-section">
-            <h1>AI Image Generator</h1>
+            <button className="menu-icon" onClick={() => setIsMenuOpen(true)}>
+              ☰
+            </button>
+            <h1 className="app-title">AI Image Generator</h1>
           </div>
           <div className="header-actions">
             <button className="theme-toggle" onClick={toggleTheme}>
-              {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+              {darkMode ? '☀️ Light' : '🌙 Dark'}
             </button>
             <button className="recent-toggle" onClick={() => setShowRecent(!showRecent)}>
-              {showRecent ? 'Hide Recent' : 'Show Recent'}
+              {showRecent ? '📚 Hide' : '📚 Show'}
             </button>
             <button className="edit-toggle" onClick={goToEditor}>
-              🖌️ Edit Images
+              🖌️ Edit
+            </button>
+            <button className="logout-button" onClick={handleLogout}>
+              🚪 Logout
             </button>
           </div>
         </div>
@@ -243,7 +505,7 @@ function App() {
               disabled={loading}
               className="generate-button"
             >
-              {loading ? 'Generating...' : 'Generate'}
+              {loading ? '⏳ Generating...' : '✨ Generate'}
             </button>
           </div>
           
@@ -264,10 +526,27 @@ function App() {
             </div>
           </div>
           
+          {/* Aspect Ratio Selector */}
+          <div className="aspect-ratio-selector">
+            <label>Aspect Ratio:</label>
+            <div className="aspect-ratio-options">
+              {aspectRatios.map((ratio) => (
+                <button
+                  key={ratio.value}
+                  className={`aspect-ratio-button ${aspectRatio === ratio.value ? 'active' : ''}`}
+                  onClick={() => setAspectRatio(ratio.value)}
+                  disabled={loading}
+                >
+                  {ratio.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
           {/* Token information with progress bar */}
           <div className="token-info-container">
             <div className="token-header">
-              <h3>Token Usage</h3>
+              <h3>📊 Token Usage</h3>
             </div>
             
             <div className="token-progress">
@@ -276,7 +555,6 @@ function App() {
                   className="progress-fill" 
                   style={{ 
                     width: `${tokenUsagePercentage}%`,
-                    backgroundColor: tokenUsagePercentage > 80 ? '#ff6b6b' : '#00dbde'
                   }}
                 ></div>
               </div>
@@ -304,17 +582,18 @@ function App() {
 
         {/* Prompt suggestions */}
         <div className="suggestions-section">
-          <h3>Trending Prompts</h3>
+          <h3>💡 Trending Prompts</h3>
           <div className="suggestions-container">
-            {promptSuggestions.map((suggestion, index) => (
+            {promptSuggestions.map((suggestion) => (
               <button
-                key={index}
+                key={suggestion.id}
                 className="suggestion-card"
-                onClick={() => useSuggestion(suggestion)}
+                onClick={() => useSuggestion(suggestion.prompt)}
                 disabled={loading}
               >
-                <span className="suggestion-number">#{index + 1}</span>
-                {suggestion}
+                <span className="suggestion-number">#{suggestion.id}</span>
+                <span className="suggestion-label">{suggestion.label}</span>
+                <span className="suggestion-category">{suggestion.category}</span>
               </button>
             ))}
           </div>
@@ -324,8 +603,8 @@ function App() {
         {showRecent && (
           <div className="recent-section">
             <div className="recent-header">
-              <h3>Recent Images</h3>
-              <button className="clear-recent" onClick={clearRecentImages}>Clear All</button>
+              <h3>🕒 Recent Images</h3>
+              <button className="clear-recent" onClick={clearRecentImages}>🗑️ Clear All</button>
             </div>
             {recentImages.length > 0 ? (
               <div className="image-gallery">
@@ -335,11 +614,14 @@ function App() {
                       <span className="image-title">Recent Image</span>
                       <span className="image-timestamp">{image.timestamp}</span>
                     </div>
-                    <img 
-                      src={image.url} 
-                      alt={`Generated AI - ${image.prompt}`} 
-                      className="generated-image"
-                    />
+                    <div className="image-display-container">
+                      <img 
+                        src={image.url} 
+                        alt={`Generated AI - ${image.prompt}`} 
+                        className="generated-image"
+                        data-aspect-ratio={image.aspectRatio || '1:1'}
+                      />
+                    </div>
                     <div className="image-prompt">
                       <p>{image.prompt}</p>
                     </div>
@@ -353,7 +635,7 @@ function App() {
                         }}
                         className="download-button"
                       >
-                        Download
+                        📥 Download
                       </button>
                     </div>
                   </div>
@@ -373,18 +655,23 @@ function App() {
 
         {/* Current Generation Output */}
         <div className="output-section">
+          {error && <div className="error-message">{error}</div>}
           {imageUrls.length > 0 ? (
             <div className="image-gallery">
               {imageUrls.map((url, index) => (
                 <div key={index} className="image-container">
                   <div className="image-header">
                     <span className="image-title">Generated Image {index + 1}</span>
+                    <span className="image-aspect-ratio">{aspectRatio}</span>
                   </div>
-                  <img 
-                    src={url} 
-                    alt={`Generated AI ${index + 1}`} 
-                    className="generated-image"
-                  />
+                  <div className="image-display-container">
+                    <img 
+                      src={url} 
+                      alt={`Generated AI ${index + 1}`} 
+                      className="generated-image"
+                      data-aspect-ratio={aspectRatio}
+                    />
+                  </div>
                   <div className="image-prompt">
                     <p>{prompt}</p>
                   </div>
@@ -398,7 +685,7 @@ function App() {
                       }}
                       className="download-button"
                     >
-                      Download
+                      📥 Download
                     </button>
                   </div>
                 </div>
@@ -412,7 +699,17 @@ function App() {
                   <p>Creating your masterpiece{imageCount > 1 ? ` (${imageCount} images)` : ''}...</p>
                   <div className="loading-details">
                     <p>Using {imageCount * 50} tokens for this request</p>
+                    <p>Aspect Ratio: {aspectRatio}</p>
                   </div>
+                </div>
+              ) : error ? (
+                <div className="empty-state">
+                  <div className="placeholder-icon">⚠️</div>
+                  <p>{error}</p>
+                  <p className="subtext">Please try again with a different prompt</p>
+                  <button className="generate-button" onClick={() => setError('')} style={{ marginTop: '1rem' }}>
+                    Clear Error
+                  </button>
                 </div>
               ) : (
                 <div className="empty-state">

@@ -16,7 +16,7 @@ function EditScreen({ onNavigateToGenerator }) {
   const fileInputRef = useRef(null);
 
   // Gemini API configuration
-  const GEMINI_API_KEY = 'AIzaSyB9slH0K_FDyTZbkshXkv_uTPcMalzz7Jc';
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBGy1p1v36TXBf0b3u6ebeCseYLovKysUw';
 
   // Initialize tokens from localStorage
   useEffect(() => {
@@ -30,6 +30,51 @@ function EditScreen({ onNavigateToGenerator }) {
     setTotalTokens(total);
     setAvailableTokens(total - used);
   }, []);
+
+  // Handle aspect ratio for browsers that don't support CSS aspect-ratio
+  useEffect(() => {
+    const handleAspectRatioFallback = () => {
+      const images = document.querySelectorAll('.preview-image[data-aspect-ratio]');
+      images.forEach(img => {
+        // Check if browser supports aspect-ratio
+        if (!window.CSS || !window.CSS.supports('aspect-ratio', '1 / 1')) {
+          const aspectRatio = img.getAttribute('data-aspect-ratio');
+          if (aspectRatio && aspectRatio !== 'auto') {
+            const ratios = aspectRatio.split(':');
+            if (ratios.length === 2) {
+              const widthRatio = parseInt(ratios[0], 10);
+              const heightRatio = parseInt(ratios[1], 10);
+              if (widthRatio && heightRatio) {
+                const container = img.closest('.image-display-container');
+                if (container) {
+                  // Set padding-top to maintain aspect ratio
+                  const percentage = (heightRatio / widthRatio) * 100;
+                  container.style.position = 'relative';
+                  container.style.paddingTop = `${percentage}%`;
+                  container.style.height = '0';
+                  img.style.position = 'absolute';
+                  img.style.top = '0';
+                  img.style.left = '0';
+                  img.style.width = '100%';
+                  img.style.height = '100%';
+                }
+              }
+            }
+          }
+        }
+      });
+    };
+
+    // Run on initial load and when images change
+    handleAspectRatioFallback();
+    
+    // Also run when window is resized
+    window.addEventListener('resize', handleAspectRatioFallback);
+    
+    return () => {
+      window.removeEventListener('resize', handleAspectRatioFallback);
+    };
+  }, [originalImage, editedImage]);
 
   // Save tokens to localStorage
   useEffect(() => {
@@ -96,7 +141,7 @@ function EditScreen({ onNavigateToGenerator }) {
           contents: [{
             parts: [
               {
-                text: "Analyze this image's main subject and generate a descriptive prompt to replace its background with something realistic and contextually appropriate. Return only the prompt without any additional text."
+                text: "You are an expert at image analysis. Carefully analyze this image and identify the main subject, paying special attention to any person in the image. Note all details including facial features, hair, clothing, and any accessories like jewelry. Generate a descriptive prompt to replace ONLY the background with something realistic and contextually appropriate that complements the main subject. The new background should enhance but not distract from the main subject. Return only the background description prompt without any additional text."
               },
               {
                 inlineData: {
@@ -115,10 +160,11 @@ function EditScreen({ onNavigateToGenerator }) {
 
       const visionData = await visionResponse.json();
       const generatedPrompt = visionData.candidates?.[0]?.content?.parts?.[0]?.text || 
-        "Enhance the background with a beautiful landscape";
+        "a beautiful landscape";
 
+      const enhancedPrompt = `Replace the background with ${generatedPrompt.toLowerCase()} while keeping the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry.`;
       setAiGeneratedPrompt(generatedPrompt);
-      setPrompt(generatedPrompt);
+      setPrompt(`You are an expert at image editing. Modify ONLY the background of this image while keeping the main subject (especially any person) completely unchanged. The main subject should remain in the exact same position, with the same facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background to: ${enhancedPrompt}. Preserve all details of the person including their face, hair, clothing, and jewelry. If there is jewelry (like gold jewelry), it must remain exactly the same.`);
       
       // Step 2: AI Image Editing (gemini-2.5-flash-image)
       // Send image and prompt to gemini-2.5-flash-image for editing
@@ -131,7 +177,7 @@ function EditScreen({ onNavigateToGenerator }) {
           contents: [{
             parts: [
               {
-                text: generatedPrompt
+                text: `You are an expert at image editing. Your task is to modify ONLY the background of this image while keeping the main subject (especially any person) completely unchanged. The main subject should remain in the exact same position, with the same facial features, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background to match this description: ${generatedPrompt}. Preserve all details of the person including their face, hair, clothing, and jewelry. If there is jewelry (like gold jewelry), it must remain exactly the same.`
               },
               {
                 inlineData: {
@@ -221,7 +267,7 @@ function EditScreen({ onNavigateToGenerator }) {
           contents: [{
             parts: [
               {
-                text: prompt
+                text: `You are an expert at image editing. Modify the image according to this prompt: ${prompt}. CRITICAL: Keep the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background or other elements as specified in the prompt. If the person is wearing jewelry (like gold jewelry), it must remain exactly the same.`
               },
               {
                 inlineData: {
@@ -361,7 +407,7 @@ function EditScreen({ onNavigateToGenerator }) {
   return (
     <div className="edit-screen">
       <header className="edit-header">
-        <h1>AI Image Editor</h1>
+        <h1>✨ AI Image Editor</h1>
         <p>Transform your photos with Gemini AI</p>
       </header>
 
@@ -369,9 +415,9 @@ function EditScreen({ onNavigateToGenerator }) {
         {!showEditPanel ? (
           <div className="upload-section">
             <div className="upload-container" onClick={triggerFileInput}>
-              <div className="upload-icon">📷</div>
+              <div className="upload-icon">📸</div>
               <p>Click to upload an image</p>
-              <p className="upload-hint">(JPG, PNG, or WEBP)</p>
+              <p className="upload-hint">Supports JPG, PNG, or WEBP formats</p>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -385,16 +431,16 @@ function EditScreen({ onNavigateToGenerator }) {
         ) : (
           <div className="edit-section">
             <div className="edit-header-bar">
-              <h2>Edit Image</h2>
+              <h2>🎨 Edit Image</h2>
               <button className="generator-button" onClick={onNavigateToGenerator}>
-                🎨 Image Generator
+                🖼️ Image Generator
               </button>
             </div>
 
             {/* Token information with progress bar */}
             <div className="token-info-container">
               <div className="token-header">
-                <h3>Token Usage</h3>
+                <h3>💳 Token Usage</h3>
               </div>
               
               <div className="token-progress">
@@ -403,24 +449,23 @@ function EditScreen({ onNavigateToGenerator }) {
                     className="progress-fill" 
                     style={{ 
                       width: `${tokenUsagePercentage}%`,
-                      backgroundColor: tokenUsagePercentage > 80 ? '#ff6b6b' : '#00dbde'
                     }}
                   ></div>
                 </div>
                 <div className="token-stats">
-                  <span className="used-tokens">{usedTokens} used</span>
-                  <span className="available-tokens">{availableTokens} available</span>
-                  <span className="total-tokens">{totalTokens} total</span>
+                  <span className="used-tokens">💳 {usedTokens} used</span>
+                  <span className="available-tokens">✅ {availableTokens} available</span>
+                  <span className="total-tokens">📊 {totalTokens} total</span>
                 </div>
               </div>
               
               <div className="token-details">
                 <div className="token-item">
-                  <span className="token-label">Auto-Enhance:</span>
+                  <span className="token-label">✨ Auto-Enhance</span>
                   <span className="token-value">100 tokens</span>
                 </div>
                 <div className="token-item">
-                  <span className="token-label">Manual Edit:</span>
+                  <span className="token-label">✏️ Manual Edit</span>
                   <span className="token-value">50 tokens</span>
                 </div>
               </div>
@@ -430,7 +475,9 @@ function EditScreen({ onNavigateToGenerator }) {
               <div className="image-panel">
                 <h3>Original</h3>
                 <div className="image-container">
-                  <img src={originalImage} alt="Original" className="preview-image" />
+                  <div className="image-display-container">
+                    <img src={originalImage} alt="Original" className="preview-image" data-aspect-ratio="auto" />
+                  </div>
                 </div>
               </div>
 
@@ -439,10 +486,15 @@ function EditScreen({ onNavigateToGenerator }) {
                 <div className="image-container">
                   {editedImage ? (
                     <div className="edited-image-container">
-                      <img src={editedImage} alt="Edited" className="preview-image" />
+                      <div className="image-display-container">
+                        <img src={editedImage} alt="Edited" className="preview-image" data-aspect-ratio="auto" />
+                      </div>
                       <div className="edit-overlay">
-                        <div className="prompt-display">
-                          <p><strong>{editMode === 'auto' ? 'AI-Generated Prompt:' : 'Applied Prompt:'}</strong> {prompt}</p>
+                        <div className="edit-overlay-content">
+                          <div className="prompt-display">
+                            <p><strong>{editMode === 'auto' ? '🤖 AI-Generated Prompt:' : '✏️ Applied Prompt:'}</strong></p>
+                            <p>{prompt}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -451,11 +503,15 @@ function EditScreen({ onNavigateToGenerator }) {
                       {loading ? (
                         <div className="loading-state">
                           <div className="spinner"></div>
-                          <p>{editMode === 'auto' ? 'AI is analyzing and enhancing your image...' : 'Processing your image...'}</p>
+                          <p>{editMode === 'auto' ? '🤖 AI is analyzing and enhancing your image...' : '🎨 Processing your image...'}</p>
                           <p className="processing-prompt">{prompt && `Applying: ${prompt}`}</p>
                         </div>
                       ) : (
-                        <p>Your edited image will appear here</p>
+                        <div className="placeholder-image">
+                          <div className="placeholder-icon">🖼️</div>
+                          <p>Your edited image will appear here</p>
+                          <p className="upload-hint">Click "Apply Edit" to process your image</p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -466,9 +522,9 @@ function EditScreen({ onNavigateToGenerator }) {
             <div className="edit-controls">
               <div className="prompt-section">
                 <div className="prompt-header">
-                  <h3>Edit Prompt</h3>
+                  <h3>💬 Edit Prompt</h3>
                   <button className="swap-image-button" onClick={triggerFileInput}>
-                    🖼️ Swap Image
+                    🔄 Swap Image
                   </button>
                   <input
                     type="file"
@@ -482,7 +538,7 @@ function EditScreen({ onNavigateToGenerator }) {
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Enter your edit instructions or click 'Auto-Enhance Background'"
+                    placeholder="Describe the changes you want to make to your image..."
                     className="prompt-textarea"
                     disabled={loading}
                   />
@@ -491,6 +547,9 @@ function EditScreen({ onNavigateToGenerator }) {
                       <small>✨ AI-Generated Prompt: {aiGeneratedPrompt}</small>
                     </div>
                   )}
+                  <div className="ai-prompt-note" style={{ marginTop: '10px' }}>
+                    <small>ℹ️ Auto-Enhance analyzes your image and changes only the background while preserving the main subject.</small>
+                  </div>
                 </div>
               </div>
 
@@ -500,14 +559,14 @@ function EditScreen({ onNavigateToGenerator }) {
                   onClick={autoEnhanceBackground}
                   disabled={loading}
                 >
-                  ✨ Auto-Enhance Background (100 tokens)
+                  🤖 {loading && editMode === 'auto' ? 'Processing...' : 'Auto-Enhance Background'} (100 tokens)
                 </button>
                 <button 
                   className="manual-edit-button" 
                   onClick={manualEdit}
                   disabled={loading}
                 >
-                  {loading ? 'Processing...' : 'Apply Edit (50 tokens)'}
+                  {loading && editMode === 'manual' ? 'Processing...' : '✏️ Apply Edit'} (50 tokens)
                 </button>
               </div>
 
@@ -516,7 +575,7 @@ function EditScreen({ onNavigateToGenerator }) {
               {editedImage && (
                 <div className="download-section">
                   <button className="download-button" onClick={downloadImage}>
-                    📥 Download Edited Image
+                    💾 Download Edited Image
                   </button>
                 </div>
               )}
