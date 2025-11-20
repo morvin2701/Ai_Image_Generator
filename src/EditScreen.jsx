@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import './EditScreen.css';
 
-function EditScreen({ onNavigateToGenerator }) {
+function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
   const [originalImage, setOriginalImage] = useState(null);
   const [editedImage, setEditedImage] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -15,8 +15,8 @@ function EditScreen({ onNavigateToGenerator }) {
   const [totalTokens, setTotalTokens] = useState(1000);
   const fileInputRef = useRef(null);
 
-  // Gemini API configuration
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBGy1p1v36TXBf0b3u6ebeCseYLovKysUw';
+  // Use the API key passed from the parent component
+  const GEMINI_API_KEY = geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('geminiApiKey') || 'AIzaSyAkzLWnwb9zK9mV2w78qzH_M_mqVUztZII';
 
   // Initialize tokens from localStorage
   useEffect(() => {
@@ -129,7 +129,10 @@ function EditScreen({ onNavigateToGenerator }) {
       
       // Step 1: AI Vision & Prompt Generation (gemini-2.5-flash)
       // Extract base64 data from data URL
-      const base64Data = originalImage.split(',')[1];
+      let base64Data = originalImage;
+      if (originalImage.startsWith('data:')) {
+        base64Data = originalImage.split(',')[1];
+      }
       
       // Send image to gemini-2.5-flash for analysis
       const visionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -139,13 +142,14 @@ function EditScreen({ onNavigateToGenerator }) {
         },
         body: JSON.stringify({
           contents: [{
+            role: "user",
             parts: [
               {
-                text: "You are an expert at image analysis. Carefully analyze this image and identify the main subject, paying special attention to any person in the image. Note all details including facial features, hair, clothing, and any accessories like jewelry. Generate a descriptive prompt to replace ONLY the background with something realistic and contextually appropriate that complements the main subject. The new background should enhance but not distract from the main subject. Return only the background description prompt without any additional text."
+                text: "Analyze the main subject of this image. Generate a concise, descriptive prompt for an AI image editor to replace the background with a new, realistic, and contextually appropriate one that complements the main subject. The new background should enhance but not distract from the main subject. Return only the background description prompt without any additional text."
               },
               {
                 inlineData: {
-                  mimeType: "image/jpeg",
+                  mimeType: "image/png",
                   data: base64Data
                 }
               }
@@ -155,46 +159,58 @@ function EditScreen({ onNavigateToGenerator }) {
       });
 
       if (!visionResponse.ok) {
-        throw new Error(`Vision API request failed with status ${visionResponse.status}`);
+        const errorText = await visionResponse.text();
+        console.error('Vision API Error Response:', errorText); // Debug log
+        throw new Error(`Vision API request failed with status ${visionResponse.status}: ${errorText}`);
       }
 
       const visionData = await visionResponse.json();
+      console.log('Vision API Response:', visionData); // Debug log
+      
       const generatedPrompt = visionData.candidates?.[0]?.content?.parts?.[0]?.text || 
         "a beautiful landscape";
 
-      const enhancedPrompt = `Replace the background with ${generatedPrompt.toLowerCase()} while keeping the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry.`;
       setAiGeneratedPrompt(generatedPrompt);
-      setPrompt(`You are an expert at image editing. Modify ONLY the background of this image while keeping the main subject (especially any person) completely unchanged. The main subject should remain in the exact same position, with the same facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background to: ${enhancedPrompt}. Preserve all details of the person including their face, hair, clothing, and jewelry. If there is jewelry (like gold jewelry), it must remain exactly the same.`);
+      setPrompt(generatedPrompt);
       
       // Step 2: AI Image Editing (gemini-2.5-flash-image)
-      // Send image and prompt to gemini-2.5-flash-image for editing
+      // Send image and prompt to gemini-2.5-flash-image model for editing
+      const editPayload = {
+        contents: [{
+          role: "user",
+          parts: [
+            {
+              text: `Modify ONLY the background of this image to match: ${generatedPrompt}. CRITICAL: Keep the main subject (especially any person) completely unchanged, preserving all details including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background.`
+            },
+            {
+              inlineData: {
+                mimeType: "image/png",
+                data: base64Data
+              }
+            }
+          ]
+        }]
+      };
+      
+      console.log('Edit API Request Payload:', editPayload); // Debug log
+      
+      // Use the correct model name
       const editResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: `You are an expert at image editing. Your task is to modify ONLY the background of this image while keeping the main subject (especially any person) completely unchanged. The main subject should remain in the exact same position, with the same facial features, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background to match this description: ${generatedPrompt}. Preserve all details of the person including their face, hair, clothing, and jewelry. If there is jewelry (like gold jewelry), it must remain exactly the same.`
-              },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64Data
-                }
-              }
-            ]
-          }]
-        }),
+        body: JSON.stringify(editPayload),
       });
 
       if (!editResponse.ok) {
-        throw new Error(`Edit API request failed with status ${editResponse.status}`);
+        const errorText = await editResponse.text();
+        console.error('Edit API Error Response:', errorText); // Debug log
+        throw new Error(`Edit API request failed with status ${editResponse.status}: ${errorText}`);
       }
 
       const editData = await editResponse.json();
+      console.log('Edit API Response:', editData); // Debug log
       
       // Extract the edited image from the response
       if (editData.candidates && editData.candidates[0] && editData.candidates[0].content) {
@@ -208,7 +224,7 @@ function EditScreen({ onNavigateToGenerator }) {
       }
       
       // Fallback if no image in response
-      throw new Error('No edited image in API response');
+      throw new Error('No edited image in API response. Response structure: ' + JSON.stringify(editData));
     } catch (err) {
       // Refund tokens on error
       const newUsedTokens = usedTokens - 100;
@@ -230,7 +246,7 @@ function EditScreen({ onNavigateToGenerator }) {
     }
   };
 
-  // Manual edit with custom prompt using Gemini Pro Image
+  // Manual edit with custom prompt using Gemini model
   const manualEdit = async () => {
     if (!originalImage || !prompt.trim()) {
       setError('Please upload an image and enter a prompt.');
@@ -255,36 +271,47 @@ function EditScreen({ onNavigateToGenerator }) {
       setAvailableTokens(totalTokens - newUsedTokens);
       
       // Extract base64 data from data URL
-      const base64Data = originalImage.split(',')[1];
+      let base64Data = originalImage;
+      if (originalImage.startsWith('data:')) {
+        base64Data = originalImage.split(',')[1];
+      }
       
-      // Send image and prompt to gemini-1.5-pro for editing
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
+      // Send image and prompt to gemini-2.0-flash-exp-image-generation for editing
+      const editPayload = {
+        contents: [{
+          role: "user",
+          parts: [
+            {
+              text: `Modify the image according to this prompt: ${prompt}. CRITICAL: Keep the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background or other elements as specified in the prompt. If the person is wearing jewelry (like gold jewelry), it must remain exactly the same.`
+            },
+            {
+              inlineData: {
+                mimeType: "image/png",
+                data: base64Data
+              }
+            }
+          ]
+        }]
+      };
+      
+      console.log('Manual Edit API Request Payload:', editPayload); // Debug log
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: `You are an expert at image editing. Modify the image according to this prompt: ${prompt}. CRITICAL: Keep the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background or other elements as specified in the prompt. If the person is wearing jewelry (like gold jewelry), it must remain exactly the same.`
-              },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64Data
-                }
-              }
-            ]
-          }]
-        }),
+        body: JSON.stringify(editPayload),
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        const errorText = await response.text();
+        console.error('Manual Edit API Error Response:', errorText); // Debug log
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Manual Edit API Response:', data); // Debug log
       
       // Extract the edited image from the response
       if (data.candidates && data.candidates[0] && data.candidates[0].content) {
@@ -298,23 +325,15 @@ function EditScreen({ onNavigateToGenerator }) {
       }
       
       // Fallback if no image in response
-      throw new Error('No edited image in API response');
+      throw new Error('No edited image in API response. Response structure: ' + JSON.stringify(data));
     } catch (err) {
       // Refund tokens on error
-      const newUsedTokens = usedTokens - 50;
+      const newUsedTokens = usedTokens - tokensNeeded;
       setUsedTokens(newUsedTokens);
       setAvailableTokens(totalTokens - newUsedTokens);
       
       setError(`Failed to edit image: ${err.message}`);
-      console.error('Edit error:', err);
-      
-      // Fallback to simulated effect
-      try {
-        const processedImage = await applyVisualEffect(originalImage, 'manual');
-        setEditedImage(processedImage);
-      } catch (fallbackErr) {
-        setError('Failed to process image even with fallback method');
-      }
+      console.error('Manual edit error:', err);
     } finally {
       setLoading(false);
     }

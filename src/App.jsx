@@ -257,7 +257,7 @@ function App() {
 
     // Validate API key
     if (!GEMINI_API_KEY) {
-      setError('API key is missing. Please add your Gemini API key either in the .env file or enter it on the login screen.');
+      setError('API key is missing. Please add your Gemini API key either in the .env file or enter it on the login screen. Get your API key from https://aistudio.google.com/');
       return;
     }
 
@@ -397,7 +397,7 @@ function App() {
 
   // Show EditScreen if currentScreen is 'editor'
   if (currentScreen === 'editor') {
-    return <EditScreen onNavigateToGenerator={goToGenerator} />;
+    return <EditScreen onNavigateToGenerator={goToGenerator} geminiApiKey={GEMINI_API_KEY} />;
   }
 
   // Show Login screen if currentScreen is 'login'
@@ -440,7 +440,7 @@ function App() {
                   <button 
                     type="button" 
                     className="api-key-info-button"
-                    onClick={() => alert('Get your Gemini API key from Google AI Studio at https://aistudio.google.com/')}
+                    onClick={() => alert('Get your Gemini API key from Google AI Studio at https://aistudio.google.com/\n\n1. Visit the link above\n2. Sign in with your Google account\n3. Create a new API key\n4. Copy and paste it here or in your .env file')}
                   >
                     ℹ️
                   </button>
@@ -607,7 +607,7 @@ function App() {
             <div className="token-details">
               <div className="token-item">
                 <span className="token-label">This Request:</span>
-                <span className="token-value">{imageCount * 50} tokens</span>
+                <span className="token-value">{imageCount * 50} tokens</span> 
               </div>
               <div className="token-item">
                 <span className="token-label">Images Generated:</span>

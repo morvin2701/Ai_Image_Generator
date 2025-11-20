@@ -4,42 +4,34 @@ An AI-powered image generation application using Google's Gemini API.
 
 ## Setup Instructions
 
-1. Clone the repository
-2. Install dependencies:
+1. Get your Gemini API key from [Google AI Studio](https://aistudio.google.com/)
+2. Create a `.env` file in the root directory with your API key:
+   
+   ```
+   VITE_GEMINI_API_KEY=YOUR_ACTUAL_API_KEY_HERE
+   ```
+
+3. Install dependencies:
    ```bash
    npm install
    ```
-3. Create a `.env` file in the root directory with your Gemini API key:
-   ```env
-   VITE_GEMINI_API_KEY=your_actual_api_key_here
-   ```
+
 4. Start the development server:
    ```bash
    npm run dev
    ```
 
-## Environment Variables
+## Usage
 
-- `VITE_GEMINI_API_KEY`: Your Gemini API key (required)
+1. Log in with default credentials (username: `abc`, password: `123`)
+2. Enter your Gemini API key on the login screen if not set in `.env`
+3. Describe the image you want to generate
+4. Select the number of images and aspect ratio
+5. Click "Generate" to create your images
 
-To obtain a Gemini API key:
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Create an account or sign in
-3. Navigate to API keys section
-4. Create a new API key
-5. Copy the key and paste it in your `.env` file
+## Troubleshooting
 
-## Available Scripts
-
-- `npm run dev`: Start the development server
-- `npm run build`: Build the production version
-- `npm run preview`: Preview the production build
-
-## Features
-
-- Generate AI images using text prompts
-- Multiple image count options (1-4 images)
-- Various aspect ratios (1:1, 16:9, 9:16, 4:3, 3:4)
-- Token usage tracking
-- Recent images gallery
-- Dark/light mode toggle
+If you encounter an "API key not valid" error:
+1. Verify your API key is correct and active in Google AI Studio
+2. Make sure the API key is properly set in your `.env` file
+3. Restart the development server after updating the `.env` file
