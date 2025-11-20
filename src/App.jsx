@@ -6,6 +6,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState('login'); // 'login', 'generator' or 'editor'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [apiKey, setApiKey] = useState(''); // New state for API key
   const [loginError, setLoginError] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false); // For drawer menu
   const [prompt, setPrompt] = useState('');
@@ -27,6 +28,10 @@ function App() {
     e.preventDefault();
     // Simple validation - in a real app, you would authenticate with a server
     if (username === 'abc' && password === '123') {
+      // Save API key to localStorage
+      if (apiKey) {
+        localStorage.setItem('geminiApiKey', apiKey);
+      }
       setCurrentScreen('generator');
       setLoginError('');
     } else {
@@ -42,7 +47,7 @@ function App() {
   };
 
   // Gemini API configuration
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('geminiApiKey') || '';
   const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict';
 
   // Trendy prompt suggestions
@@ -153,6 +158,12 @@ function App() {
       }
     }
     
+    // Initialize API key from localStorage
+    const savedApiKey = localStorage.getItem('geminiApiKey');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+    
     // Initialize tokens from localStorage or use defaults
     const savedUsedTokens = localStorage.getItem('usedTokens');
     const savedGeneratedCount = localStorage.getItem('generatedCount');
@@ -246,7 +257,7 @@ function App() {
 
     // Validate API key
     if (!GEMINI_API_KEY) {
-      setError('API key is missing. Please add your Gemini API key to the .env file.');
+      setError('API key is missing. Please add your Gemini API key either in the .env file or enter it on the login screen.');
       return;
     }
 
@@ -395,27 +406,55 @@ function App() {
       <div className="app">
         <div className="login-container">
           <div className="login-card">
-            <h1>AI Image Generator</h1>
-            <p className="login-subtitle">Sign in to your account</p>
-            <form onSubmit={handleLogin}>
+            <div className="login-header">
+              <h1 className="login-title">AI Image Generator</h1>
+              <p className="login-subtitle">Sign in to your account</p>
+            </div>
+            <form onSubmit={handleLogin} className="login-form">
               <div className="input-group">
+                <label className="input-label">Username</label>
                 <input
                   type="text"
-                  placeholder="Username"
+                  placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="login-input"
+                  required
                 />
               </div>
               <div className="input-group">
+                <label className="input-label">Password</label>
                 <input
                   type="password"
-                  placeholder="Password"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="login-input"
+                  required
                 />
               </div>
+              
+              <div className="api-key-section">
+                <div className="api-key-header">
+                  <h3 className="api-key-title">Gemini API Key</h3>
+                  <button 
+                    type="button" 
+                    className="api-key-info-button"
+                    onClick={() => alert('Get your Gemini API key from Google AI Studio at https://aistudio.google.com/')}
+                  >
+                    ℹ️
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  placeholder="Enter your Gemini API key"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="login-input api-key-input"
+                />
+                <p className="api-key-note">Enter your Gemini API key to enable image generation</p>
+              </div>
+              
               {loginError && <div className="error-message">{loginError}</div>}
               <button type="submit" className="login-button">
                 Sign In
