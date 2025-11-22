@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import './EditScreen.css';
 
-function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
+function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDarkMode, onToggleTheme }) {
   const [originalImage, setOriginalImage] = useState(null);
   const [editedImage, setEditedImage] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -14,6 +14,11 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
   const [usedTokens, setUsedTokens] = useState(0);
   const [totalTokens, setTotalTokens] = useState(1000);
   const fileInputRef = useRef(null);
+  
+  // Use prop if provided, otherwise get from localStorage
+  const darkMode = initialDarkMode !== undefined 
+    ? initialDarkMode 
+    : (localStorage.getItem('theme') === 'dark' || localStorage.getItem('theme') !== 'light');
 
   // Use the API key passed from the parent component
   const GEMINI_API_KEY = geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('geminiApiKey') || 'AIzaSyAkzLWnwb9zK9mV2w78qzH_M_mqVUztZII';
@@ -30,6 +35,21 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
     setTotalTokens(total);
     setAvailableTokens(total - used);
   }, []);
+
+  // Apply theme class to body when darkMode prop changes
+  useEffect(() => {
+    const currentDarkMode = initialDarkMode !== undefined 
+      ? initialDarkMode 
+      : (localStorage.getItem('theme') === 'dark' || localStorage.getItem('theme') !== 'light');
+      
+    if (currentDarkMode) {
+      document.body.classList.add('dark-mode');
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+      document.body.classList.remove('dark-mode');
+    }
+  }, [initialDarkMode]);
 
   // Handle aspect ratio for browsers that don't support CSS aspect-ratio
   useEffect(() => {
@@ -81,6 +101,13 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
     localStorage.setItem('usedTokens', usedTokens.toString());
     localStorage.setItem('totalTokens', totalTokens.toString());
   }, [usedTokens, totalTokens]);
+
+  // Toggle theme function - always use parent's toggle function
+  const toggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme();
+    }
+  };
 
   // Handle image upload
   const handleImageUpload = (event) => {
@@ -428,6 +455,9 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
       <header className="edit-header">
         <h1>✨ AI Image Editor</h1>
         <p>Transform your photos with Gemini AI</p>
+        <button className="theme-toggle" onClick={toggleTheme}>
+          {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
       </header>
 
       <main className="edit-main">
@@ -542,9 +572,14 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey }) {
               <div className="prompt-section">
                 <div className="prompt-header">
                   <h3>💬 Edit Prompt</h3>
-                  <button className="swap-image-button" onClick={triggerFileInput}>
-                    🔄 Swap Image
-                  </button>
+                  <div className="prompt-header-actions">
+                    <button className="swap-image-button" onClick={triggerFileInput}>
+                      🔄 Swap Image
+                    </button>
+                    <button className="theme-toggle" onClick={toggleTheme}>
+                      {darkMode ? '☀️ Light' : '🌙 Dark'}
+                    </button>
+                  </div>
                   <input
                     type="file"
                     ref={fileInputRef}

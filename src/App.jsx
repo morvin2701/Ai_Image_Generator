@@ -22,7 +22,7 @@ function App() {
   const [generatedCount, setGeneratedCount] = useState(0);
   const [recentImages, setRecentImages] = useState([]);
   const [showRecent, setShowRecent] = useState(false);
-
+  
   // Handle login
   const handleLogin = (e) => {
     e.preventDefault();
@@ -266,6 +266,11 @@ function App() {
       setError('Please select a valid number of images (1-4)');
       return;
     }
+    
+    // Additional validation for API limits
+    if (imageCount > 1) {
+      console.log('Generating multiple images:', imageCount);
+    }
 
     // Validate aspect ratio
     if (!aspectRatio) {
@@ -292,49 +297,85 @@ function App() {
       }
       
       // Call Gemini API for image generation with timeout
+      const requestBody = {
+        instances: [
+          {
+            prompt: prompt.trim(),
+          },
+        ],
+        parameters: {
+          sampleCount: imageCount,
+          // Add aspect ratio parameter
+          aspectRatio: aspectRatio
+        },
+      };
+      
+      console.log('Sending request to API with aspect ratio:', aspectRatio);
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+      
       const fetchPromise = fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          instances: [
-            {
-              prompt: prompt.trim(),
-            },
-          ],
-          parameters: {
-            sampleCount: imageCount,
-            // Add aspect ratio parameter
-            aspectRatio: aspectRatio
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const response = await Promise.race([fetchPromise, timeoutPromise]);
 
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('API error response:', errorText);
         throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('API response data:', JSON.stringify(data, null, 2));
       
       // Extract the base64 encoded images from the response
+      console.log('API response structure:', JSON.stringify(data, null, 2));
+      
       if (data.predictions && data.predictions.length > 0) {
-        const urls = data.predictions.slice(0, imageCount).map(prediction => {
-          if (prediction.bytesBase64Encoded) {
-            return `data:image/png;base64,${prediction.bytesBase64Encoded}`;
-          }
-          return null;
-        }).filter(url => url !== null);
+        // Handle both single prediction with multiple images and multiple predictions
+        let allImages = [];
         
-        if (urls.length === 0) {
-          throw new Error('No valid images were generated. Please try a different prompt.');
+        // Check if we have a single prediction with multiple images
+        if (data.predictions[0] && data.predictions[0].images) {
+          // New API format with images array
+          console.log('Using new API format with images array');
+          allImages = data.predictions[0].images.slice(0, imageCount).map(image => {
+            if (image.bytesBase64Encoded) {
+              return `data:image/png;base64,${image.bytesBase64Encoded}`;
+            }
+            return null;
+          }).filter(url => url !== null);
+        } else {
+          // Old format with multiple predictions
+          console.log('Using old API format with multiple predictions');
+          allImages = data.predictions.slice(0, imageCount).map(prediction => {
+            if (prediction.bytesBase64Encoded) {
+              return `data:image/png;base64,${prediction.bytesBase64Encoded}`;
+            }
+            return null;
+          }).filter(url => url !== null);
         }
         
-        setImageUrls(urls);
-        setGeneratedCount(prev => prev + urls.length);
+        console.log('Extracted images:', allImages);
+        
+        if (allImages.length === 0) {
+          console.error('No valid images extracted from API response');
+          throw new Error(`No valid images were generated for aspect ratio ${aspectRatio}. Please try a different prompt or aspect ratio.`);
+        }
+        
+        // Additional validation to ensure we have the expected number of images
+        if (allImages.length < imageCount) {
+          console.warn(`Expected ${imageCount} images but only received ${allImages.length}`);
+        }
+        
+        setImageUrls(allImages);
+        setGeneratedCount(prev => prev + allImages.length);
         
         // Update token usage
         const newUsedTokens = usedTokens + tokensNeeded;
@@ -342,7 +383,7 @@ function App() {
         setAvailableTokens(totalTokens - newUsedTokens);
         
         // Add to recent images
-        const newImages = urls.map((url, index) => ({
+        const newImages = allImages.map((url, index) => ({
           id: Date.now() + index,
           url: url,
           prompt: prompt,
@@ -352,13 +393,22 @@ function App() {
         
         setRecentImages(prev => [...newImages, ...prev].slice(0, 20)); // Keep only last 20 images
       } else {
-        throw new Error('Invalid response format from API. Please try again.');
+        throw new Error(`Invalid response format from API for aspect ratio ${aspectRatio}. Please try again with a different aspect ratio or prompt.`);
       }
     } catch (err) {
-      setError(`Failed to generate image: ${err.message}`);
       console.error('Error generating image:', err);
+      setError(`Failed to generate image: ${err.message}`);
       // Ensure we show the error to the user
       setImageUrls([]); // Clear any partial results
+      
+      // Log additional debugging information
+      console.error('Current state:', {
+        prompt,
+        imageCount,
+        aspectRatio,
+        availableTokens,
+        GEMINI_API_KEY: GEMINI_API_KEY ? 'SET' : 'NOT SET'
+      });
     } finally {
       setLoading(false);
     }
@@ -375,7 +425,7 @@ function App() {
   };
 
   const toggleTheme = () => {
-    setDarkMode(!darkMode);
+    setDarkMode(prevMode => !prevMode);
   };
 
   // Calculate token usage percentage for progress bar
@@ -397,7 +447,7 @@ function App() {
 
   // Show EditScreen if currentScreen is 'editor'
   if (currentScreen === 'editor') {
-    return <EditScreen onNavigateToGenerator={goToGenerator} geminiApiKey={GEMINI_API_KEY} />;
+    return <EditScreen onNavigateToGenerator={goToGenerator} geminiApiKey={GEMINI_API_KEY} darkMode={darkMode} onToggleTheme={toggleTheme} />;
   }
 
   // Show Login screen if currentScreen is 'login'
