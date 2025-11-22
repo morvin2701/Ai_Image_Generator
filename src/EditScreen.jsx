@@ -13,7 +13,17 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
   const [availableTokens, setAvailableTokens] = useState(1000);
   const [usedTokens, setUsedTokens] = useState(0);
   const [totalTokens, setTotalTokens] = useState(1000);
+  const [aspectRatio, setAspectRatio] = useState('1:1'); // New state for aspect ratio
   const fileInputRef = useRef(null);
+  
+  // Aspect ratio options
+  const aspectRatios = [
+    { value: '1:1', label: '1:1 (Square)' },
+    { value: '16:9', label: '16:9 (Landscape)' },
+    { value: '9:16', label: '9:16 (Portrait)' },
+    { value: '4:3', label: '4:3 (Standard)' },
+    { value: '3:4', label: '3:4 (Vertical)' }
+  ];
   
   // Use prop if provided, otherwise get from localStorage
   const darkMode = initialDarkMode !== undefined 
@@ -207,7 +217,7 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
           role: "user",
           parts: [
             {
-              text: `Modify ONLY the background of this image to match: ${generatedPrompt}. CRITICAL: Keep the main subject (especially any person) completely unchanged, preserving all details including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background.`
+              text: `Modify ONLY the background of this image to match: ${generatedPrompt}. CRITICAL: Keep the main subject (especially any person) completely unchanged, preserving all details including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background. Also, ensure the output image has an aspect ratio of ${aspectRatio}.`
             },
             {
               inlineData: {
@@ -309,7 +319,7 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
           role: "user",
           parts: [
             {
-              text: `Modify the image according to this prompt: ${prompt}. CRITICAL: Keep the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background or other elements as specified in the prompt. If the person is wearing jewelry (like gold jewelry), it must remain exactly the same.`
+              text: `Modify the image according to this prompt: ${prompt}. CRITICAL: Keep the main subject (especially if it's a person) completely unchanged, in focus, and with all details preserved including facial features, hair, clothing, and jewelry. Do not add, remove, or modify any part of the main subject. Only change the background or other elements as specified in the prompt. If the person is wearing jewelry (like gold jewelry), it must remain exactly the same. Also, ensure the output image has an aspect ratio of ${aspectRatio}.`
             },
             {
               inlineData: {
@@ -525,7 +535,7 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
                 <h3>Original</h3>
                 <div className="image-container">
                   <div className="image-display-container">
-                    <img src={originalImage} alt="Original" className="preview-image" data-aspect-ratio="auto" />
+                    <img src={originalImage} alt="Original" className="preview-image" data-aspect-ratio={aspectRatio} />
                   </div>
                 </div>
               </div>
@@ -536,7 +546,7 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
                   {editedImage ? (
                     <div className="edited-image-container">
                       <div className="image-display-container">
-                        <img src={editedImage} alt="Edited" className="preview-image" data-aspect-ratio="auto" />
+                        <img src={editedImage} alt="Edited" className="preview-image" data-aspect-ratio={aspectRatio} />
                       </div>
                       <div className="edit-overlay">
                         <div className="edit-overlay-content">
@@ -569,6 +579,23 @@ function EditScreen({ onNavigateToGenerator, geminiApiKey, darkMode: initialDark
             </div>
 
             <div className="edit-controls">
+              {/* Aspect Ratio Selector */}
+              <div className="aspect-ratio-selector">
+                <h3>📐 Aspect Ratio</h3>
+                <div className="aspect-ratio-options">
+                  {aspectRatios.map((ratio) => (
+                    <button
+                      key={ratio.value}
+                      className={`aspect-ratio-button ${aspectRatio === ratio.value ? 'active' : ''}`}
+                      onClick={() => setAspectRatio(ratio.value)}
+                      disabled={loading}
+                    >
+                      {ratio.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="prompt-section">
                 <div className="prompt-header">
                   <h3>💬 Edit Prompt</h3>

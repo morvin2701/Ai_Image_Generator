@@ -457,7 +457,7 @@ function App() {
         <div className="login-container">
           <div className="login-card">
             <div className="login-header">
-              <h1 className="login-title">AI Image Generator</h1>
+              <h1 className="login-title">DataCare Softech</h1>
               <p className="login-subtitle">Sign in to your account</p>
             </div>
             <form onSubmit={handleLogin} className="login-form">
@@ -558,7 +558,7 @@ function App() {
             <button className="menu-icon" onClick={() => setIsMenuOpen(true)}>
               ☰
             </button>
-            <h1 className="app-title">AI Image Generator</h1>
+            <h1 className="app-title">DataCare Softech</h1>
           </div>
           <div className="header-actions">
             <button className="theme-toggle" onClick={toggleTheme}>
